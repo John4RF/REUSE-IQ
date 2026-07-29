@@ -57,6 +57,9 @@ INDEX_TEMPLATE = """<!doctype html>
     <p class="tagline">{count} circular-economy &amp; reuse organisations, researched and sourced worldwide.</p>
   </div>
 </header>
+<div class="banner-notice">
+  <p>📋 Spot an error, or know an organisation we're missing? <a href="https://docs.google.com/forms/d/e/1FAIpQLSe_flqrEXOmmf-IfqSQGh_H-9qflTSvqqopmbcNpWj_QB9rvg/viewform">Report a correction</a> · <a href="https://docs.google.com/forms/d/e/1FAIpQLSd1e4e8IPGx8PdBmmNGUbQ0RonYZuTFBcnPsP8cJoESxbl8JA/viewform">Suggest a new organisation</a></p>
+</div>
 <main class="index">
   <p class="subtitle">A research-grade, publicly-citable database of reuse, refill, deposit-return, and packaging-as-a-service organisations worldwide. Full methodology in the <a href="https://github.com/{gh_repo}">GitHub repo</a>.</p>
 
@@ -111,6 +114,7 @@ INDEX_TEMPLATE = """<!doctype html>
 </main>
 <footer class="site-footer">
   <p>Data generated from <a href="data/REUSE_V4_Master.csv">REUSE_V4_Master.csv</a>. Last built: {build_date}.</p>
+  <p class="footer-note">Help us keep this database accurate and complete. Use the links above to report corrections or suggest organisations we've missed — every submission is reviewed before being added.</p>
 </footer>
 <script src="assets/data.js"></script>
 <script src="assets/site.js"></script>
@@ -199,6 +203,15 @@ body {
 }
 .brand-mark { display: inline-block; vertical-align: middle; }
 .site-header .tagline { margin: 0.4rem 0 0; max-width: 900px; color: #d7d7d7; line-height: 1.5; }
+.banner-notice {
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 0.7rem 2.2rem;
+  text-align: center;
+}
+.banner-notice p { margin: 0; font-size: 0.88rem; color: var(--accent-dark); }
+.banner-notice a { color: var(--accent-dark); font-weight: 700; text-decoration: underline; }
+.banner-notice a:hover { text-decoration: none; }
 main.index, main.profile {
   max-width: 1400px;
   margin: 0 auto;
@@ -308,9 +321,10 @@ main.profile table th { background: var(--accent-bg); color: var(--fg); }
 main.profile h2 { font-size: 1.1rem; margin-top: 1.8rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
 main.profile a { color: var(--accent-dark); }
 .site-footer { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 2rem 1.5rem 3rem; }
+.site-footer .footer-note { margin-top: 0.5rem; max-width: 60ch; margin-left: auto; margin-right: auto; }
 
 @media (max-width: 980px) {
-  .site-header, main.index, main.profile { padding-left: 1.1rem; padding-right: 1.1rem; }
+  .site-header, main.index, main.profile, .banner-notice { padding-left: 1.1rem; padding-right: 1.1rem; }
   .summary { grid-template-columns: repeat(2, 1fr); }
   .controls { grid-template-columns: 1fr; }
   .cards { grid-template-columns: 1fr; }
