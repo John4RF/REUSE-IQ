@@ -74,12 +74,10 @@ function statusClass(status) {
 }
 
 function renderSummary(rows) {
-  const withHighPriority = rows.filter(o => /Essential|High/.test(o.priority || '')).length;
   const active = rows.filter(o => /active/i.test(o.status || '') && !/inactive/i.test(o.status || '')).length;
   const countries = new Set(rows.map(o => o.country).filter(c => c && c !== 'Not publicly available')).size;
   document.getElementById('summary').innerHTML = `
     <div class="metric"><div class="label">Organisations shown</div><div class="value">${rows.length}</div></div>
-    <div class="metric"><div class="label">Essential / High priority</div><div class="value">${withHighPriority}</div></div>
     <div class="metric"><div class="label">Confirmed active</div><div class="value">${active}</div></div>
     <div class="metric"><div class="label">Countries represented</div><div class="value">${countries}</div></div>
   `;

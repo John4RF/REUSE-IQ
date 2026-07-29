@@ -61,7 +61,10 @@ INDEX_TEMPLATE = """<!doctype html>
   <p>📋 Spot an error, or know an organisation we're missing? <a href="https://docs.google.com/forms/d/e/1FAIpQLSe_flqrEXOmmf-IfqSQGh_H-9qflTSvqqopmbcNpWj_QB9rvg/viewform">Report a correction</a> · <a href="https://docs.google.com/forms/d/e/1FAIpQLSd1e4e8IPGx8PdBmmNGUbQ0RonYZuTFBcnPsP8cJoESxbl8JA/viewform">Suggest a new organisation</a></p>
 </div>
 <main class="index">
-  <p class="subtitle">A research-grade, publicly-citable database of reuse, refill, deposit-return, and packaging-as-a-service organisations worldwide. Full methodology in the <a href="https://github.com/{gh_repo}">GitHub repo</a>.</p>
+  <p class="subtitle">Welcome to REUSE-IQ, a global database of reuse solutions. Thank you for your interest!</p>
+  <p class="subtitle">This is currently in beta as we expand its reach and improve the quality of the data it holds.</p>
+  <p class="subtitle">If you see an error or want to suggest a new organisation, please use the links above.</p>
+  <p class="subtitle">Also, we are actively talking to some organisations to prepare case studies that showcase their work and how they can prevent plastic waste. If you are interested in working with us to prepare one, please <a href="https://docs.google.com/forms/d/e/1FAIpQLSc3Zk8OCuw2pbU9d_G2XjV2rre8wgEsDIaI64cga7ApmZayXA/viewform">complete this form</a>.</p>
 
   <div id="summary" class="summary"></div>
 
@@ -222,7 +225,7 @@ h1 { font-size: 1.6rem; margin-bottom: 0.4rem; }
 .subtitle a, .site-footer a { color: var(--accent-dark); font-weight: 600; }
 .summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
   gap: 1rem;
   margin-bottom: 1.2rem;
 }
@@ -408,12 +411,10 @@ function statusClass(status) {
 }
 
 function renderSummary(rows) {
-  const withHighPriority = rows.filter(o => /Essential|High/.test(o.priority || '')).length;
   const active = rows.filter(o => /active/i.test(o.status || '') && !/inactive/i.test(o.status || '')).length;
   const countries = new Set(rows.map(o => o.country).filter(c => c && c !== 'Not publicly available')).size;
   document.getElementById('summary').innerHTML = `
     <div class="metric"><div class="label">Organisations shown</div><div class="value">${rows.length}</div></div>
-    <div class="metric"><div class="label">Essential / High priority</div><div class="value">${withHighPriority}</div></div>
     <div class="metric"><div class="label">Confirmed active</div><div class="value">${active}</div></div>
     <div class="metric"><div class="label">Countries represented</div><div class="value">${countries}</div></div>
   `;

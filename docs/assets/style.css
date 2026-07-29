@@ -98,7 +98,7 @@ h1 { font-size: 1.6rem; margin-bottom: 0.4rem; }
 .subtitle a, .site-footer a { color: var(--accent-dark); font-weight: 600; }
 .summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
   gap: 1rem;
   margin-bottom: 1.2rem;
 }
