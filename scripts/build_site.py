@@ -107,7 +107,6 @@ INDEX_TEMPLATE = """<!doctype html>
           <th data-key="categories">Categories</th>
           <th data-key="year" class="sortable">Founded</th>
           <th data-key="status" class="sortable">Status</th>
-          <th data-key="priority" class="sortable">Priority</th>
         </tr>
       </thead>
       <tbody id="org-table-body"></tbody>
@@ -425,7 +424,6 @@ function renderCards(rows) {
       <div>
         <h2><a href="organisations/${o.slug}.html">${escapeHtml(o.name)}</a></h2>
         <div class="meta">
-          <span class="${priorityClass(o.priority)}">${escapeHtml(o.priority || 'Not rated')}</span>
           <span class="${statusClass(o.status)}">${escapeHtml(o.status || 'Status unknown')}</span>
         </div>
       </div>
@@ -452,7 +450,6 @@ function renderTable(rows) {
       <td>${(o.categories || '').split(',').filter(Boolean).map(t => `<span class="tag-pill">${escapeHtml(t.trim())}</span>`).join('')}</td>
       <td>${escapeHtml(o.year) || '—'}</td>
       <td><span class="${statusClass(o.status)}">${escapeHtml(o.status || '—')}</span></td>
-      <td class="priority">${escapeHtml(o.priority) || '—'}</td>
     </tr>
   `).join('');
 }
@@ -519,12 +516,30 @@ def load_rows():
         return list(csv.DictReader(f))
 
 
+HIDDEN_MD_SECTIONS = ("REUSE Foundation Assessment", "Verification Notes")
+
+
+def strip_hidden_sections(text):
+    """Removes site-display-only sections (and the trailing confidence line) before
+    HTML conversion. Source .md files are never modified - this only affects docs/ output."""
+    for header in HIDDEN_MD_SECTIONS:
+        text = re.sub(
+            rf"##\s*{re.escape(header)}\s*\n.*?(?=\n##\s|\Z)",
+            "",
+            text,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+    text = re.sub(r"\n-{3,}\s*\nConfidence\s*—.*\Z", "\n", text, flags=re.DOTALL)
+    return text
+
+
 def convert_org_md_to_html(slug, name):
     md_path = os.path.join(ORG_DIR, f"{slug}.md")
     if not os.path.exists(md_path):
         return None
     with open(md_path, encoding="utf-8") as f:
         text = f.read()
+    text = strip_hidden_sections(text)
     body_html = markdown.markdown(text, extensions=["tables", "fenced_code"])
     return body_html
 

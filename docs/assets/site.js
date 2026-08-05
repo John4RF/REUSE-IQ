@@ -89,7 +89,6 @@ function renderCards(rows) {
       <div>
         <h2><a href="organisations/${o.slug}.html">${escapeHtml(o.name)}</a></h2>
         <div class="meta">
-          <span class="${priorityClass(o.priority)}">${escapeHtml(o.priority || 'Not rated')}</span>
           <span class="${statusClass(o.status)}">${escapeHtml(o.status || 'Status unknown')}</span>
         </div>
       </div>
@@ -116,7 +115,6 @@ function renderTable(rows) {
       <td>${(o.categories || '').split(',').filter(Boolean).map(t => `<span class="tag-pill">${escapeHtml(t.trim())}</span>`).join('')}</td>
       <td>${escapeHtml(o.year) || '—'}</td>
       <td><span class="${statusClass(o.status)}">${escapeHtml(o.status || '—')}</span></td>
-      <td class="priority">${escapeHtml(o.priority) || '—'}</td>
     </tr>
   `).join('');
 }
