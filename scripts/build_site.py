@@ -10,6 +10,8 @@ import shutil
 
 import markdown
 
+import generate_locations_json
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORG_DIR = os.path.join(REPO_ROOT, "organisations")
 CSV_PATH = os.path.join(REPO_ROOT, "data", "REUSE_V4_Master.csv")
@@ -49,6 +51,9 @@ INDEX_TEMPLATE = """<!doctype html>
 <meta name="description" content="A research-grade, citable database of {count} circular-economy and reuse organisations worldwide.">
 <link rel="icon" href="assets/reuse-logo.png" type="image/png">
 <link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
 </head>
 <body>
 <header class="site-header">
@@ -61,9 +66,25 @@ INDEX_TEMPLATE = """<!doctype html>
   <p>📋 Spot an error, or know an organisation we're missing? <a href="https://docs.google.com/forms/d/e/1FAIpQLSe_flqrEXOmmf-IfqSQGh_H-9qflTSvqqopmbcNpWj_QB9rvg/viewform">Report a correction</a> · <a href="https://docs.google.com/forms/d/e/1FAIpQLSd1e4e8IPGx8PdBmmNGUbQ0RonYZuTFBcnPsP8cJoESxbl8JA/viewform">Suggest a new organisation</a></p>
 </div>
 <main class="index">
-  <p class="subtitle">Welcome to REUSE-IQ, a global database of reuse solutions. Thank you for your interest!</p>
-  <p class="subtitle">It’s currently in beta as we expand its reach and improve the quality of the data it holds - if you see an error or want to suggest a new organisation, please use the links above</p>
-  <p class="subtitle">Also, we are actively talking to some organisations to prepare case studies that showcase their work and how they can prevent plastic waste. If you are interested in working with us to prepare one, please <a href="https://docs.google.com/forms/d/e/1FAIpQLSc3Zk8OCuw2pbU9d_G2XjV2rre8wgEsDIaI64cga7ApmZayXA/viewform">complete this form</a>.</p>
+  <div class="hero-row">
+    <div class="hero-copy">
+      <p class="subtitle"><b>Welcome to REUSE-IQ</b>, a global database of reuse solutions. Thank you for your interest!</p>
+      <p class="subtitle">It’s currently in beta as we expand its reach and improve the quality of the data it holds - if you see an error or want to suggest a new organisation, please use the links above</p>
+      <p class="subtitle">Also, we are actively talking to some organisations to prepare case studies that showcase their work and how they can prevent plastic waste. If you are interested in working with us to prepare one, please <a href="https://docs.google.com/forms/d/e/1FAIpQLSc3Zk8OCuw2pbU9d_G2XjV2rre8wgEsDIaI64cga7ApmZayXA/viewform">complete this form</a>.</p>
+    </div>
+    <div class="map-preview-card" id="preview-card" tabindex="0" role="button" aria-label="Open full map of reuse organisations">
+      <div id="preview-map"></div>
+      <div class="preview-overlay">
+        <span class="preview-stat"><strong>{geocoded_count}</strong>organisations</span>
+        <span class="expand-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+          </svg>
+          Click to expand
+        </span>
+      </div>
+    </div>
+  </div>
 
   <div id="summary" class="summary"></div>
 
@@ -113,12 +134,43 @@ INDEX_TEMPLATE = """<!doctype html>
     </table>
   </div>
 </main>
+
+<div class="map-modal" id="map-modal" role="dialog" aria-modal="true" aria-label="Interactive map of reuse organisations">
+  <div class="map-modal-backdrop" id="modal-backdrop"></div>
+  <div class="map-modal-panel">
+    <div class="modal-header">
+      <h2 class="modal-title">Reuse organisations <span class="count" id="visible-count">{geocoded_count}</span></h2>
+      <div class="modal-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+        </svg>
+        <input type="text" id="map-search" placeholder="Filter by name, country or category&hellip;" />
+      </div>
+      <button class="modal-close" id="modal-close" aria-label="Close map">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="full-map"></div>
+      <div class="legend">
+        <div class="legend-row"><span class="legend-dot city"></span> Precise location known</div>
+        <div class="legend-row"><span class="legend-dot country"></span> Country-level estimate</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <footer class="site-footer">
   <p>Data generated from <a href="data/REUSE_V4_Master.csv">REUSE_V4_Master.csv</a>. Last built: {build_date}.</p>
   <p class="footer-note">Help us keep this database accurate and complete. Use the links above to report corrections or suggest organisations we've missed — every submission is reviewed before being added.</p>
 </footer>
 <script src="assets/data.js"></script>
 <script src="assets/site.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="assets/map.js"></script>
 </body>
 </html>
 """
@@ -143,6 +195,16 @@ CSS = """
   --shadow: 0 8px 24px rgba(20,30,40,.07);
   --header-bg: #000000;
   --header-fg: #ffffff;
+  --ink: #16241d;
+  --paper: #f6f5f0;
+  --paper-raised: #ffffff;
+  --line: #dad5c8;
+  --forest: #2f6e51;
+  --forest-dark: #1f4d38;
+  --map-amber: #c17a3c;
+  --amber-soft: #eadfc9;
+  --mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -221,6 +283,76 @@ main.index, main.profile {
 h1 { font-size: 1.6rem; margin-bottom: 0.4rem; }
 .subtitle { color: var(--muted); max-width: 80ch; margin: 1.2rem 0 1.2rem; }
 .subtitle a, .site-footer a { color: var(--accent-dark); font-weight: 600; }
+
+.hero-row { display: grid; grid-template-columns: 1fr 400px; gap: 2rem; align-items: start; margin: 0.4rem 0 1.2rem; }
+
+/* ---------- Preview map card ---------- */
+.map-preview-card {
+  position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+  background: var(--paper-raised); box-shadow: 0 1px 2px rgba(22,36,29,0.04); cursor: pointer;
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.map-preview-card:hover { box-shadow: 0 6px 20px rgba(22,36,29,0.10); transform: translateY(-1px); }
+.map-preview-card:focus-visible { outline: 3px solid var(--forest); outline-offset: 2px; }
+#preview-map { height: 280px; width: 100%; background: #e9e6dc; }
+#preview-map { pointer-events: none; }
+.preview-overlay {
+  position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 14px 16px; background: linear-gradient(180deg, rgba(22,36,29,0) 55%, rgba(22,36,29,0.55) 100%);
+  pointer-events: none;
+}
+.preview-stat { font-family: var(--mono); font-size: 13px; color: #fff; letter-spacing: 0.02em; }
+.preview-stat strong { font-size: 18px; display: block; line-height: 1.1; }
+.expand-pill {
+  font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink); background: #fff;
+  padding: 8px 14px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.expand-pill svg { width: 14px; height: 14px; }
+
+/* ---------- Modal ---------- */
+.map-modal { position: fixed; inset: 0; z-index: 1000; display: none; }
+.map-modal.is-open { display: block; }
+.map-modal-backdrop { position: absolute; inset: 0; background: rgba(16, 24, 20, 0.55); backdrop-filter: blur(2px); opacity: 0; transition: opacity 0.2s ease; }
+.map-modal.is-open .map-modal-backdrop { opacity: 1; }
+.map-modal-panel {
+  position: absolute; inset: 20px; background: var(--paper-raised); border-radius: 16px; overflow: hidden;
+  display: flex; flex-direction: column; transform: scale(0.97); opacity: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.map-modal.is-open .map-modal-panel { transform: scale(1); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .map-modal-backdrop, .map-modal-panel, .map-preview-card { transition: none !important; }
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--paper-raised); }
+.modal-title { font-size: 15px; font-weight: 600; margin: 0; display: flex; align-items: baseline; gap: 8px; }
+.modal-title .count { font-family: var(--mono); font-size: 12px; color: var(--forest); background: var(--amber-soft); background: #e4efe8; padding: 2px 8px; border-radius: 999px; }
+.modal-search { flex: 1; max-width: 320px; position: relative; }
+.modal-search input { width: 100%; font-family: var(--sans); font-size: 13px; padding: 8px 12px 8px 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+.modal-search input:focus { outline: 2px solid var(--forest); outline-offset: -1px; }
+.modal-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: #8a8577; }
+.modal-close { border: none; background: var(--paper); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--ink); flex-shrink: 0; }
+.modal-close:hover { background: var(--line); }
+.modal-close:focus-visible { outline: 2px solid var(--forest); }
+.modal-body { flex: 1; position: relative; }
+#full-map { height: 100%; width: 100%; }
+.legend { position: absolute; bottom: 16px; left: 16px; z-index: 500; background: rgba(255,255,255,0.95); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 12px; line-height: 1.7; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+.legend-row { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.legend-dot.city { background: var(--forest); }
+.legend-dot.country { background: transparent; border: 2px solid var(--map-amber); }
+
+/* ---------- Leaflet marker + popup skin ---------- */
+.reuse-marker-city { background: var(--forest); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+.reuse-marker-country { background: transparent; border: 2px solid var(--map-amber); border-radius: 50%; }
+.leaflet-popup-content-wrapper { border-radius: 10px; font-family: var(--sans); }
+.popup-org { font-weight: 700; font-size: 14px; margin: 0 0 2px; }
+.popup-meta { font-size: 12px; color: #55503f; margin: 0 0 8px; }
+.popup-meta .sep { margin: 0 4px; opacity: 0.5; }
+.popup-link { font-family: var(--mono); font-size: 11px; color: var(--forest-dark); text-decoration: none; border-bottom: 1px solid currentColor; }
+.marker-cluster-reuse { background: rgba(47, 110, 81, 0.18); }
+.marker-cluster-reuse div { background: var(--forest); color: #fff; font-family: var(--mono); font-weight: 600; }
+
 .summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -330,6 +462,7 @@ main.profile a { color: var(--accent-dark); }
   .controls { grid-template-columns: 1fr; }
   .cards { grid-template-columns: 1fr; }
   table { min-width: 720px; }
+  .hero-row { grid-template-columns: 1fr; }
 }
 """
 
@@ -495,6 +628,182 @@ populateFilters();
 render();
 """
 
+MAP_JS = """
+(async function () {
+  const res = await fetch('assets/reuse_locations.json');
+  const LOCATIONS = await res.json();
+
+  // ---------------------------------------------------------------
+  // Shared marker-building logic (used by both the preview & full map)
+  // ---------------------------------------------------------------
+  function makeIcon(precision) {
+    const cls = precision === 'city' ? 'reuse-marker-city' : 'reuse-marker-country';
+    const size = precision === 'city' ? 10 : 12;
+    return L.divIcon({
+      className: cls,
+      iconSize: [size, size],
+    });
+  }
+
+  function buildMarkers(records, { withPopups }) {
+    return records.map(function (rec) {
+      const marker = L.marker([rec.lat, rec.lon], { icon: makeIcon(rec.precision) });
+      marker.reuseRecord = rec;
+      if (withPopups) {
+        marker.bindPopup(
+          '<p class="popup-org">' + escapeHtml(rec.name) + '</p>' +
+          '<p class="popup-meta">' + escapeHtml(rec.country) +
+            '<span class="sep">&middot;</span>' + escapeHtml(rec.category) + '</p>' +
+          '<a class="popup-link" href="#" onclick="focusOrgInTable(\\'' + rec.id + '\\'); return false;">View in table &rarr;</a>'
+        );
+      }
+      return marker;
+    });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  // ---------------------------------------------------------------
+  // Hook this up to whatever powers your existing Table/Card view.
+  // Simplest approach: set the search box's value and dispatch an
+  // input event so your existing filter logic picks it up.
+  // ---------------------------------------------------------------
+  function focusOrgInTable(id) {
+    document.getElementById('map-modal').classList.remove('is-open');
+    document.body.style.overflow = '';
+    console.log('TODO: wire this up to scroll/filter the main table to organisation id:', id);
+    // Example, if your table view has its own search input:
+    // const tableSearch = document.querySelector('#reuse-table-search');
+    // tableSearch.value = LOCATIONS.find(r => r.id === id).name;
+    // tableSearch.dispatchEvent(new Event('input'));
+  }
+  window.focusOrgInTable = focusOrgInTable;
+
+  // ---------------------------------------------------------------
+  // PREVIEW MAP - static-feeling teaser, no interaction, cheap to draw
+  // ---------------------------------------------------------------
+  const previewMap = L.map('preview-map', {
+    zoomControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false,
+    attributionControl: false,
+    fadeAnimation: false,
+  }).setView([15, 10], 2);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 18,
+  }).addTo(previewMap);
+
+  const previewCluster = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: false,
+    iconCreateFunction: clusterIcon,
+  });
+  previewCluster.addLayers(buildMarkers(LOCATIONS, { withPopups: false }));
+  previewMap.addLayer(previewCluster);
+
+  // ---------------------------------------------------------------
+  // FULL MAP - built lazily, first time the modal opens
+  // ---------------------------------------------------------------
+  let fullMap = null;
+  let fullClusterGroup = null;
+  let allMarkers = [];
+
+  function initFullMapIfNeeded() {
+    if (fullMap) return;
+
+    fullMap = L.map('full-map', { zoomControl: true }).setView([15, 10], 2);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+    }).addTo(fullMap);
+
+    fullClusterGroup = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      iconCreateFunction: clusterIcon,
+      maxClusterRadius: 50,
+    });
+
+    allMarkers = buildMarkers(LOCATIONS, { withPopups: true });
+    fullClusterGroup.addLayers(allMarkers);
+    fullMap.addLayer(fullClusterGroup);
+  }
+
+  function clusterIcon(cluster) {
+    const count = cluster.getChildCount();
+    const size = count < 10 ? 32 : count < 50 ? 40 : 50;
+    return L.divIcon({
+      html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;' +
+        'display:flex;align-items:center;justify-content:center;font-size:' +
+        (count < 100 ? 13 : 11) + 'px;">' + count + '</div>',
+      className: 'marker-cluster-reuse',
+      iconSize: L.point(size, size),
+    });
+  }
+
+  // ---------------------------------------------------------------
+  // Modal open / close
+  // ---------------------------------------------------------------
+  const modal = document.getElementById('map-modal');
+  const previewCard = document.getElementById('preview-card');
+  const closeBtn = document.getElementById('modal-close');
+  const backdrop = document.getElementById('modal-backdrop');
+  const searchInput = document.getElementById('map-search');
+  const visibleCount = document.getElementById('visible-count');
+
+  function openModal() {
+    modal.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    initFullMapIfNeeded();
+    // Leaflet maps created while display:none render broken - fix on open.
+    setTimeout(function () { fullMap.invalidateSize(); }, 50);
+    searchInput.focus();
+  }
+
+  function closeModal() {
+    modal.classList.remove('is-open');
+    document.body.style.overflow = '';
+    previewCard.focus();
+  }
+
+  previewCard.addEventListener('click', openModal);
+  previewCard.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openModal(); }
+  });
+  closeBtn.addEventListener('click', closeModal);
+  backdrop.addEventListener('click', closeModal);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+  });
+
+  // ---------------------------------------------------------------
+  // Live search/filter inside the expanded map
+  // ---------------------------------------------------------------
+  searchInput.addEventListener('input', function (e) {
+    const q = e.target.value.trim().toLowerCase();
+    fullClusterGroup.clearLayers();
+
+    const matches = !q ? allMarkers : allMarkers.filter(function (m) {
+      const r = m.reuseRecord;
+      return r.name.toLowerCase().includes(q) ||
+             r.country.toLowerCase().includes(q) ||
+             r.category.toLowerCase().includes(q);
+    });
+
+    fullClusterGroup.addLayers(matches);
+    visibleCount.textContent = matches.length;
+  });
+})();
+"""
+
 
 def slugify_fallback(name):
     s = re.sub(r"[^a-zA-Z0-9]+", "-", name.strip()).strip("-").lower()
@@ -595,6 +904,8 @@ def build_index(rows):
             "status": row.get("Status", "").strip(),
         })
 
+    geocoded_count = sum(1 for r in rows if r.get("Latitude", "").strip() and r.get("Longitude", "").strip())
+
     import json
     data_js = "const ORGS = " + json.dumps(orgs_js, ensure_ascii=False) + ";\n"
 
@@ -606,11 +917,14 @@ def build_index(rows):
         f.write(SITE_JS)
     with open(os.path.join(assets_dir, "data.js"), "w", encoding="utf-8") as f:
         f.write(data_js)
+    with open(os.path.join(assets_dir, "map.js"), "w", encoding="utf-8") as f:
+        f.write(MAP_JS)
 
     import datetime
     build_date = datetime.date.today().isoformat()
     index_html = INDEX_TEMPLATE.format(
         count=len(rows),
+        geocoded_count=geocoded_count,
         gh_repo="Martydell/REUSE-Foundation-Knowledge-Library",
         build_date=build_date,
     )
@@ -628,6 +942,7 @@ def main():
         f.write("")
     written = build_profile_pages(rows)
     build_index(rows)
+    generate_locations_json.main(CSV_PATH, os.path.join(DOCS_DIR, "assets", "reuse_locations.json"))
     print(f"Wrote {written} profile pages + index.html to docs/ (from {len(rows)} CSV rows)")
 
 
